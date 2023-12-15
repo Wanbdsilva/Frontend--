@@ -7,7 +7,9 @@ namespace webapi.event_.Interfaces
         void Cadastrar(Evento evento);
         void Deletar(Guid id);
         List<Evento> Listar();
+
         List<Evento> ListarProximos();
+        List<Evento> ListarAnteriores();
         Evento BuscarPorId(Guid id);
         void Atualizar(Guid id, Evento evento);
     }

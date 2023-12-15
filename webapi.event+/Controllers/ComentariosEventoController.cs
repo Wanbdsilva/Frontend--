@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.CognitiveServices.ContentModerator;
+using Microsoft.IdentityModel.Tokens;
 using System.Linq.Expressions;
+using System.Text;
 using webapi.event_.Domains;
 using webapi.event_.Repositories;
 
@@ -12,6 +15,65 @@ namespace webapi.event_.Controllers
     public class ComentariosEventoController : ControllerBase
     {
         ComentariosEventoRepository comentario = new ComentariosEventoRepository();
+
+        // armazena dados do servico da API externa (IA - Azure)
+        private readonly ContentModeratorClient _contentModeratorClient;
+
+        /// <summary>
+        /// Construtor que recebe os dados necessarios para acesso ao servico externo 
+        /// </summary>
+        /// <param name="contentModeratorClient">objeto do tipo ContentModeratorClient</param>
+        public ComentariosEventoController(ContentModeratorClient contentModeratorClient)
+        {
+            _contentModeratorClient = contentModeratorClient;
+        }
+
+        [HttpPost("ComentarioIA")]
+        public async Task<IActionResult> PostIA(ComentariosEvento novoComentario)
+        {
+            try
+            {
+                if((novoComentario.Descricao).IsNullOrEmpty()) 
+                {
+                    return BadRequest("A descrição do comentario não pode estar vazio ou nulo!");
+                }
+
+                using var stream = new MemoryStream(Encoding.UTF8.GetBytes(novoComentario.Descricao));
+
+                var moderationResult = await _contentModeratorClient.TextModeration.ScreenTextAsync("text/plain", stream, "por", false, false, null, true);
+
+                if(moderationResult.Terms != null)
+                {
+                    novoComentario.Exibe = false;
+
+                    comentario.Cadastrar(novoComentario);
+                }
+                else
+                {
+                    novoComentario.Exibe = true;
+
+                    comentario.Cadastrar(novoComentario);
+                }
+                return StatusCode(201, novoComentario);
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
+
+        [HttpGet("ListarSomenteExibe")]
+        public IActionResult getShow()
+        {
+            try
+            {
+                return Ok(comentario.Listar());
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
 
         [HttpGet]
         public IActionResult get()
